@@ -1,6 +1,7 @@
 # JAPxRock · The Autonomous AI DJ & YouTube Music Hook Sequencer
 
-> **100% Open Source · Serverless · GitHub Pages Ready · Zero API Keys Required**
+> 🌐 **Live Website:** [https://spjee08.github.io/JAPxRock/](https://spjee08.github.io/JAPxRock/)  
+> **100% Open Source · Serverless · GitHub Pages Hosted · Zero API Keys Required**
 
 **JAPxRock** is a serverless, dual-deck party DJ and automated music sequencing engine. Tell JAPxRock the vibe of the room or paste any YouTube / YouTube Music playlist or song link, and it dynamically mixes the set: party tracks that drop straight into the best verse/hook and crossfade seamlessly into the next.
 
@@ -72,69 +73,6 @@ npm run lint
 
 # Build static production bundle
 npm run build
-```
-
----
-
-## 🌐 Deploy to GitHub Pages
-
-JAPxRock is configured to deploy directly to GitHub Pages using GitHub Actions.
-
-### 1. Enable GitHub Actions Deployment
-1. Go to your repository on GitHub.
-2. Navigate to **Settings** $\rightarrow$ **Pages**.
-3. Under **Build and deployment** $\rightarrow$ **Source**, select **GitHub Actions**.
-
-### 2. Push to Main
-Push your code to the `main` (or `master`) branch:
-
-```bash
-git add .
-git commit -m "Deploy JAPxRock to GitHub Pages"
-git push origin main
-```
-
-The included workflow in `.github/workflows/deploy.yml` will automatically build the static assets and deploy them to `https://<your-username>.github.io/<repo-name>/`.
-
----
-
-## 📁 Project Architecture
-
-```
-JAPxr/
-├── .github/
-│   └── workflows/
-│       └── deploy.yml          # GitHub Pages CI/CD deployment
-├── public/                     # Static public assets
-├── src/
-│   ├── components/
-│   │   ├── Deck.tsx            # YouTube player deck component
-│   │   ├── NowPlaying.tsx      # Main live performance view & AI DJ HUD
-│   │   ├── QueueDrawer.tsx     # Up-next sequencer, drag-and-drop reorder & playlist saver
-│   │   ├── SetReview.tsx       # Pre-flight set review & energy arc curve
-│   │   ├── SharedControls.tsx  # Song request box & navigation controls
-│   │   ├── SubViews.tsx        # My Sets, Custom Playlists, Tune Hooks & REA Dossier
-│   │   ├── Waveform.tsx        # 100-bar replay heat waveform renderer
-│   │   ├── YtMusicMiniPlayer.tsx # Persistent minimized playback bar
-│   │   └── YtPlaylistImporter.tsx # Universal YouTube URL & playlist hook importer
-│   ├── data/
-│   │   └── seed.json           # 1,346 curated party tracks across 19 vibes
-│   ├── types/
-│   │   └── jap.ts              # TypeScript domain interfaces (Cue, CustomPlaylist, etc.)
-│   ├── utils/
-│   │   ├── clientApi.ts        # 100% serverless client API & storage engine
-│   │   ├── hookMath.ts         # Gaussian smoothing, spectral flux, bimodal prior & TSP
-│   │   ├── japMath.test.ts     # Mathematical verification test suite
-│   │   ├── japSeed.ts          # Trigonometric equal-power crossfader & FNV-1a hash
-│   │   ├── playerEngine.ts     # Dual-deck YouTube IFrame state machine
-│   │   └── setlistBuilder.ts   # Mulberry32 seeded candidate setlist constructor
-│   ├── App.tsx                 # Root application controller & navigation state
-│   ├── index.css               # Tailwind CSS 4 design system
-│   └── main.tsx                # React DOM entry point
-├── package.json                # Dependencies, scripts and homepage config
-├── tsconfig.json               # TypeScript strict configuration
-├── vite.config.ts              # Vite configuration (relative base './' for Pages)
-└── README.md                   # Documentation
 ```
 
 ---
