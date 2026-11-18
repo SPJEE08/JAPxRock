@@ -1,0 +1,6 @@
+{
+  "name": "JAPxRock · The Aux & YT Music Hook Engine",
+  "description": "Automated party DJ & YouTube Music playlist hook engine that drops every song straight into its best verse and crossfades seamlessly.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
