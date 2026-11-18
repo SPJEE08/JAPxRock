@@ -240,6 +240,99 @@ export async function fetchSingleVideoClientInfo(videoId: string): Promise<Scrap
   };
 }
 
+const PUBLIC_INVIDIOUS_MIRRORS = [
+  'https://inv.nadeko.net',
+  'https://invidious.jing.rocks',
+  'https://yt.artemislena.eu',
+  'https://invidious.projectsegfau.lt',
+];
+
+/**
+ * Client-Side Public YouTube / YouTube Music Playlist Tracklist Fetcher.
+ * Queries fast CORS-friendly Invidious mirrors with failover to YouTube oEmbed.
+ * Extracts real song titles, video IDs, artists, and durations client-side without private keys.
+ */
+export async function fetchYouTubePlaylistClientInfo(
+  playlistId: string
+): Promise<{ title: string; tracks: ScrapedVideoItem[] } | null> {
+  const cleanId = playlistId.startsWith('VL') ? playlistId.slice(2) : playlistId;
+
+  // Tier 1: Try public Invidious instances with open CORS
+  for (const mirror of PUBLIC_INVIDIOUS_MIRRORS) {
+    try {
+      const url = `${mirror}/api/v1/playlists/${cleanId}`;
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        signal: AbortSignal.timeout(4500),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (!data || !Array.isArray(data.videos) || data.videos.length === 0) continue;
+
+      const title = String(data.title || 'YouTube Music Playlist').trim();
+      const tracks: ScrapedVideoItem[] = data.videos
+        .filter((v: any) => v && v.videoId && !v.liveNow)
+        .slice(0, 50)
+        .map((v: any) => {
+          const rawTitle = String(v.title || 'YouTube Track').trim();
+          const rawAuthor = String(v.author || '').trim();
+          const { title: cleanTitle, artist: cleanArtist } = splitArtistAndTitle(
+            rawTitle,
+            rawAuthor || 'YouTube Music'
+          );
+          const duration =
+            typeof v.lengthSeconds === 'number' && v.lengthSeconds > 0
+              ? v.lengthSeconds
+              : 205;
+          return {
+            videoId: v.videoId,
+            title: cleanTitle,
+            artist: cleanArtist,
+            durationSec: duration,
+            thumbnail: `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`,
+          };
+        });
+
+      if (tracks.length > 0) {
+        return { title, tracks };
+      }
+    } catch {
+      // try next mirror
+    }
+  }
+
+  // Tier 2: Official YouTube oEmbed (CORS-friendly public metadata)
+  try {
+    const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(
+      `https://www.youtube.com/playlist?list=${cleanId}`
+    )}&format=json`;
+    const res = await fetch(oembedUrl, { signal: AbortSignal.timeout(3500) });
+    if (res.ok) {
+      const data = await res.json();
+      const title = String(data.title || '').trim();
+      let firstVideoId: string | null = null;
+      if (data.thumbnail_url) {
+        const m = data.thumbnail_url.match(/\/vi\/([a-zA-Z0-9_-]{11})\//);
+        if (m) firstVideoId = m[1];
+      }
+      if (firstVideoId) {
+        const leadTrack = await fetchSingleVideoClientInfo(firstVideoId);
+        return {
+          title: title || leadTrack.title,
+          tracks: [leadTrack],
+        };
+      }
+      if (title) {
+        return { title, tracks: [] };
+      }
+    }
+  } catch {
+    // network fallback
+  }
+
+  return null;
+}
+
 export interface ClientAnalyzeResult {
   ok: boolean;
   playlistTitle: string;
@@ -278,9 +371,13 @@ export async function analyzeYouTubeInputClient(params: {
   let cues: Cue[] = [];
   let sourceType: 'live-yt-playlist' | 'live-yt-video' | 'preset' | 'search' = 'live-yt-playlist';
 
-  // Case A: Preset Playlist ID or Known Preset
-  if (parsed.type === 'playlist' && parsed.playlistId && PRESET_FILTERS[parsed.playlistId]) {
-    const preset = PRESET_FILTERS[parsed.playlistId];
+  // Case A: Built-in JAP Presets
+  if (
+    parsed.type === 'playlist' &&
+    parsed.playlistId &&
+    (parsed.playlistId.startsWith('jap-preset:') || parsed.playlistId.startsWith('naux-preset:'))
+  ) {
+    const preset = PRESET_FILTERS[parsed.playlistId] ?? PRESET_FILTERS['jap-preset:punjabi-club'];
     sourceType = 'preset';
     playlistTitle = preset.title;
     const matchedCues = library.filter(preset.filter).slice(0, preset.limit);
@@ -299,8 +396,103 @@ export async function analyzeYouTubeInputClient(params: {
         hookMode
       )
     );
+  } else if (parsed.type === 'playlist' && parsed.playlistId) {
+    // Case B: Live YouTube / YouTube Music Playlist URL
+    sourceType = 'live-yt-playlist';
+
+    // 1. Fetch real tracks from live public Invidious / oEmbed mirrors
+    const liveData = await fetchYouTubePlaylistClientInfo(parsed.playlistId);
+
+    if (liveData && liveData.tracks.length > 0) {
+      playlistTitle = liveData.title;
+      const tracksToUse = liveData.tracks.slice();
+
+      // If user pasted a watch link (music.youtube.com/watch?v=...&list=...), prioritize that video as #1
+      if (parsed.videoIds.length > 0) {
+        const leadVid = parsed.videoIds[0];
+        const leadIdx = tracksToUse.findIndex((t) => t.videoId === leadVid);
+        if (leadIdx > 0) {
+          const [leadTrack] = tracksToUse.splice(leadIdx, 1);
+          tracksToUse.unshift(leadTrack);
+        } else if (leadIdx < 0) {
+          const leadTrack = await fetchSingleVideoClientInfo(leadVid);
+          tracksToUse.unshift(leadTrack);
+        }
+      }
+
+      cues = tracksToUse.map((t, idx) => buildAnalyzedCueFromTrack(t, idx, hookMode));
+    } else if (PRESET_FILTERS[parsed.playlistId]) {
+      // 2. Fall back to preset filter if available (e.g. offline fallback for Top 100 or Hit List)
+      const preset = PRESET_FILTERS[parsed.playlistId];
+      sourceType = 'preset';
+      playlistTitle = preset.title;
+      const matchedCues = library.filter(preset.filter).slice(0, preset.limit);
+      cues = matchedCues.map((c, i) =>
+        buildAnalyzedCueFromTrack(
+          {
+            videoId: c.youtube_ids[0],
+            title: c.title,
+            artist: c.artist,
+            durationSec: c.duration_sec,
+            heat: c.heat,
+            thumbnail: c.art,
+            extraVideoIds: c.youtube_ids.slice(1),
+          },
+          i,
+          hookMode
+        )
+      );
+    } else if (parsed.videoIds.length > 0) {
+      // 3. Fall back to lead video + similar energetic party tracks
+      const seedInfo = await fetchSingleVideoClientInfo(parsed.videoIds[0]);
+      const seedCue = buildAnalyzedCueFromTrack(seedInfo, 0, hookMode);
+      playlistTitle = liveData?.title || `YT Music Mix · ${seedCue.title}`;
+      const similar = library
+        .filter(
+          (c) =>
+            c.song_id !== seedCue.song_id &&
+            c.language === seedCue.language &&
+            Math.abs(c.energy - seedCue.energy) <= 2
+        )
+        .slice(0, 14)
+        .map((c, idx) =>
+          buildAnalyzedCueFromTrack(
+            {
+              videoId: c.youtube_ids[0],
+              title: c.title,
+              artist: c.artist,
+              durationSec: c.duration_sec,
+              heat: c.heat,
+              extraVideoIds: c.youtube_ids.slice(1),
+            },
+            idx + 1,
+            hookMode
+          )
+        );
+      cues = [seedCue, ...similar];
+    } else {
+      // 4. Fallback matching top bangers for the room
+      const partyPicks = library
+        .filter((c) => c.energy >= 7 && (c.fame ?? 2) >= 2)
+        .slice(0, 20);
+      playlistTitle = liveData?.title || `YT Music Set (${parsed.playlistId.slice(0, 10)})`;
+      cues = partyPicks.map((c, idx) =>
+        buildAnalyzedCueFromTrack(
+          {
+            videoId: c.youtube_ids[0],
+            title: c.title,
+            artist: c.artist,
+            durationSec: c.duration_sec,
+            heat: c.heat,
+            extraVideoIds: c.youtube_ids.slice(1),
+          },
+          idx,
+          hookMode
+        )
+      );
+    }
   } else if (parsed.type === 'video-list' && parsed.videoIds.length > 0) {
-    // Case B: One or more YouTube video links
+    // Case C: One or more YouTube video links
     sourceType = 'live-yt-video';
     const infos = await Promise.all(
       parsed.videoIds.slice(0, 25).map((vid) => fetchSingleVideoClientInfo(vid))
@@ -338,57 +530,6 @@ export async function analyzeYouTubeInputClient(params: {
           )
         );
       cues = [lead, ...companions];
-    }
-  } else if (parsed.type === 'playlist' && parsed.playlistId) {
-    // Case C: Arbitrary YouTube Playlist URL (attempt video IDs in URL or fall back to matching party set)
-    sourceType = 'live-yt-playlist';
-    if (parsed.videoIds.length > 0) {
-      const seedInfo = await fetchSingleVideoClientInfo(parsed.videoIds[0]);
-      const seedCue = buildAnalyzedCueFromTrack(seedInfo, 0, hookMode);
-      playlistTitle = `YT Music Mix · ${seedCue.title}`;
-      const similar = library
-        .filter(
-          (c) =>
-            c.song_id !== seedCue.song_id &&
-            c.language === seedCue.language &&
-            Math.abs(c.energy - seedCue.energy) <= 2
-        )
-        .slice(0, 14)
-        .map((c, idx) =>
-          buildAnalyzedCueFromTrack(
-            {
-              videoId: c.youtube_ids[0],
-              title: c.title,
-              artist: c.artist,
-              durationSec: c.duration_sec,
-              heat: c.heat,
-              extraVideoIds: c.youtube_ids.slice(1),
-            },
-            idx + 1,
-            hookMode
-          )
-        );
-      cues = [seedCue, ...similar];
-    } else {
-      // Fallback matching top bangers for the room
-      const partyPicks = library
-        .filter((c) => c.energy >= 7 && (c.fame ?? 2) >= 2)
-        .slice(0, 20);
-      playlistTitle = `YT Music Party Set (${parsed.playlistId.slice(0, 10)})`;
-      cues = partyPicks.map((c, idx) =>
-        buildAnalyzedCueFromTrack(
-          {
-            videoId: c.youtube_ids[0],
-            title: c.title,
-            artist: c.artist,
-            durationSec: c.duration_sec,
-            heat: c.heat,
-            extraVideoIds: c.youtube_ids.slice(1),
-          },
-          idx,
-          hookMode
-        )
-      );
     }
   } else {
     // Case D: Search query or artist name

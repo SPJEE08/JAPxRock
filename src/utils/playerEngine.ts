@@ -762,13 +762,21 @@ export class PlayerEngine {
     if (stateCode === 1) {
       // YT.PlayerState.PLAYING
       deck.usingClockFallback = false;
+      this.clearTimer(deck);
       deck.clockLastTickMs = performance.now();
+      if (deck.role === 'live') {
+        try {
+          deck.player?.unMute?.();
+          deck.player?.setVolume?.(100);
+        } catch {
+          // ignore
+        }
+      }
       if (this.awaitingStart === deck.id) {
         this.startFade(deck);
         return;
       }
       if (deck.role === 'preload' && this.liveId !== deck.id) {
-        this.clearTimer(deck);
         try {
           deck.player?.pauseVideo?.();
           deck.player?.seekTo?.(this.startSecondsOf(deck.cue), true);
@@ -784,7 +792,6 @@ export class PlayerEngine {
         return;
       }
       if (deck.role === 'live') {
-        this.clearTimer(deck);
         const wasLive = deck.status === 'live';
         deck.status = 'live';
         if (!wasLive) {
@@ -793,6 +800,26 @@ export class PlayerEngine {
         }
         this.emit();
         return;
+      }
+    }
+
+    if (stateCode === 3) {
+      // YT.PlayerState.BUFFERING - player is actively fetching video stream from YouTube
+      this.clearTimer(deck);
+      deck.timer = setTimeout(() => {
+        this.activateClockFallbackForDeck(deck);
+      }, 12000);
+      return;
+    }
+
+    if (stateCode === -1 || stateCode === 5) {
+      // Unstarted or Cued: if this deck is live, ensure it starts playing
+      if (deck.role === 'live' && !this.paused && !this.destroyed) {
+        try {
+          deck.player?.playVideo?.();
+        } catch {
+          // ignore
+        }
       }
     }
 
@@ -831,7 +858,21 @@ export class PlayerEngine {
       this.resolveAndRetryAlternates(deck);
       return;
     }
-    // 3. Otherwise engage precision clock fallback so the party never stops
+    // 3. If restricted from embedding (101/150) or unavailable (100) and no alternate sources exist:
+    // Seamlessly skip to next track in queue instead of getting stuck in dead silence!
+    if (errCode === 101 || errCode === 150 || errCode === 100) {
+      this.log(
+        `Track ${deck.cue.title} unavailable for embedding (${YT_ERROR_LABELS[errCode] ?? errCode}), advancing to next track`
+      );
+      this.event({ type: 'unavailable', cue: deck.cue });
+      if (deck.role === 'live') {
+        this.requestHandoff('skip');
+      } else {
+        this.preloadNext(deck);
+      }
+      return;
+    }
+    // 4. Otherwise engage precision clock fallback so the party never stops
     this.activateClockFallbackForDeck(deck);
   }
 
@@ -956,8 +997,8 @@ export class PlayerEngine {
       }
     }
 
-    // Use a fast 650ms preload window when stepping back to a previous song, otherwise 3500ms
-    const preloadWaitMs = this.pendingHandoff === 'previous' ? 650 : 3500;
+    // Use a 4000ms preload window when stepping back to a previous song, otherwise 12000ms to allow buffering
+    const preloadWaitMs = this.pendingHandoff === 'previous' ? 4000 : 12000;
     deck.timer = setTimeout(() => {
       this.activateClockFallbackForDeck(deck);
     }, preloadWaitMs);
