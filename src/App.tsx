@@ -44,6 +44,9 @@ import {
 import { YtMusicMiniPlayer } from './components/YtMusicMiniPlayer';
 import { YtPlaylistImporter } from './components/YtPlaylistImporter';
 import { YtMusicExplorer } from './components/YtMusicExplorer';
+import { EchoMusicPlayer } from './components/EchoMusicPlayer';
+import { EchoMusicHome } from './components/EchoMusicHome';
+import { EchoMusicSettings } from './components/EchoMusicSettings';
 
 const TIME_CARDS: Array<{ id: TimeOfNight; label: string; hint: string }> = [
   {
@@ -171,7 +174,8 @@ type AppViewMode =
   | 'tune'
   | 'rea'
   | 'sets'
-  | 'ytmusic';
+  | 'ytmusic'
+  | 'echo';
 
 export default function App() {
   const playableLibrary = useMemo(() => checkSeed(seedData).playable, []);
@@ -195,6 +199,8 @@ export default function App() {
   const [engineGeneration, setEngineGeneration] = useState(0);
   const [showPlayerTile, setShowPlayerTile] = useState(false);
   const [queueDrawerOpen, setQueueDrawerOpen] = useState(false);
+  const [echoPlayerOpen, setEchoPlayerOpen] = useState(false);
+  const [echoSettingsOpen, setEchoSettingsOpen] = useState(false);
 
   const [playedSongs, setPlayedSongs] = useState<PlayedTrackRecord[]>([]);
   const playedLogRef = useRef<PlayedTrackRecord[]>([]);
@@ -416,6 +422,36 @@ export default function App() {
             }
           }}
           hasActivePlayback={hasActivePlayback}
+          onOpenEcho={() => setView('echo')}
+        />
+      ) : view === 'echo' ? (
+        <EchoMusicHome
+          onPlaySong={(cue, title) => {
+            const ans: FunnelAnswers = {
+              languages: ['hindi', 'punjabi'],
+              subtypes: [],
+              time: 'peak',
+              crowd: 'medium',
+            };
+            setAnswers(ans);
+            setSetlistResult({
+              cues: [cue],
+              fillers: new Set(),
+              note: `Selected from Echo Music: ${title}`,
+            });
+            handleApproveAndPlay([cue]);
+            setEchoPlayerOpen(true);
+          }}
+          onOpenPlayer={() => setEchoPlayerOpen(true)}
+          onOpenSettings={() => setEchoSettingsOpen(true)}
+          onOpenSearch={() => setView('ytmusic')}
+          onOpenQueue={() => setQueueDrawerOpen(true)}
+          activeCue={engineState?.live ? engineState.decks[engineState.live]?.cue : null}
+          isPlaying={Boolean(engineState && !engineState.paused && !engineState.finished && engineState.live)}
+          onTogglePlayPause={() => engineRef.current?.togglePause()}
+          onNext={() => engineRef.current?.skip()}
+          onPrev={() => engineRef.current?.previous()}
+          library={playableLibrary}
         />
       ) : view === 'review' && setlistResult && answers ? (
         <SetReview
@@ -435,6 +471,7 @@ export default function App() {
           onMinimize={navigateToHome}
           onOpenQueue={() => setQueueDrawerOpen(true)}
           onOpenYtMusic={() => setView('ytmusic')}
+          onOpenEchoPlayer={() => setEchoPlayerOpen(true)}
           answers={answers}
           library={playableLibrary}
           showPlayerTile={showPlayerTile}
@@ -490,11 +527,24 @@ export default function App() {
               JAPxRock
             </button>
 
-            <div className="flex items-center gap-3 sm:gap-5">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <button
+                onClick={() => setView('echo')}
+                title="Echo Music with Auto Best Part of Song Picking"
+                className="flex items-center gap-1.5 rounded-full border-2 border-[#ff3b30]/80 bg-[#ff3b30]/15 px-3 py-1 font-display text-sm tracking-wide text-[#ff6b60] transition hover:bg-[#ff3b30] hover:text-white md:text-lg shadow-[0_0_15px_rgba(255,59,48,0.25)]"
+              >
+                <span className="flex h-3.5 w-5 items-center justify-center rounded-full bg-[#ff3b30] text-black">
+                  <svg className="h-2.5 w-4" viewBox="0 0 28 16" fill="currentColor">
+                    <ellipse cx="14" cy="8" rx="13" ry="7" fill="#ff3b30" />
+                    <ellipse cx="14" cy="8" rx="5" ry="3" fill="#000000" />
+                  </svg>
+                </span>
+                <span>ECHO MUSIC</span>
+              </button>
               <button
                 onClick={() => setView('ytmusic')}
                 title="Search and play from YouTube Music library"
-                className="flex items-center gap-1.5 rounded-full border-2 border-red-500/80 bg-red-500/10 px-3 py-1 font-display text-base tracking-wide text-red-400 transition hover:bg-red-500 hover:text-white md:text-xl"
+                className="flex items-center gap-1.5 rounded-full border-2 border-red-500/80 bg-red-500/10 px-3 py-1 font-display text-sm tracking-wide text-red-400 transition hover:bg-red-500 hover:text-white md:text-lg"
               >
                 <span>🎵</span>
                 <span>YT MUSIC</span>
@@ -740,17 +790,42 @@ export default function App() {
 
       {/* YouTube Music-style Minimized Bottom Mini-Player Bar when browsing outside 'playing' view */}
       {view !== 'playing' &&
+        view !== 'echo' &&
         hasActivePlayback &&
         engineRef.current &&
         engineState && (
           <YtMusicMiniPlayer
             engine={engineRef.current}
             state={engineState}
-            onExpand={() => setView('playing')}
+            onExpand={() => setEchoPlayerOpen(true)}
             onOpenQueue={() => setQueueDrawerOpen(true)}
             onExitSet={handleEndPartyToSummary}
           />
         )}
+
+      {/* Full-Screen Echo Music Player (with Auto Best Part Picking & Download Best Part) */}
+      {echoPlayerOpen && engineRef.current && engineState && (
+        <EchoMusicPlayer
+          engine={engineRef.current}
+          state={engineState}
+          onClose={() => setEchoPlayerOpen(false)}
+          onOpenQueue={() => setQueueDrawerOpen(true)}
+          onOpenSettings={() => setEchoSettingsOpen(true)}
+        />
+      )}
+
+      {/* Echo Music Main Settings (with Auto Best Part Picking Configuration) */}
+      {echoSettingsOpen && (
+        <EchoMusicSettings
+          open={echoSettingsOpen}
+          onClose={() => setEchoSettingsOpen(false)}
+          onSettingsChange={(settings) => {
+            if (engineRef.current) {
+              engineRef.current.crossfadeDurationMs = Math.round(settings.crossfadeSec * 1000);
+            }
+          }}
+        />
+      )}
 
       {/* Dual-Deck YouTube IFrame Host Container */}
       <div

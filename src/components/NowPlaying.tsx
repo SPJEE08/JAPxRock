@@ -533,6 +533,7 @@ export interface NowPlayingProps {
   onMinimize: () => void;
   onOpenQueue: () => void;
   onOpenYtMusic?: () => void;
+  onOpenEchoPlayer?: () => void;
   answers: FunnelAnswers | null;
   library: Cue[];
   showPlayerTile: boolean;
@@ -550,6 +551,7 @@ export const NowPlaying: React.FC<NowPlayingProps> = ({
   onMinimize,
   onOpenQueue,
   onOpenYtMusic,
+  onOpenEchoPlayer,
   answers,
   library,
   showPlayerTile,
@@ -868,6 +870,24 @@ export const NowPlaying: React.FC<NowPlayingProps> = ({
             >
               <span>🎵</span>
               <span className="hidden sm:inline">YT MUSIC</span>
+            </button>
+          )}
+
+          {onOpenEchoPlayer && (
+            <button
+              type="button"
+              onClick={onOpenEchoPlayer}
+              data-testid="open-echo-player-btn"
+              title="Open Echo Music Player with Auto Best Part Picking & Download Clip"
+              className="flex items-center gap-1.5 rounded-full border-2 border-[#ff3b30]/80 bg-[#ff3b30]/15 px-3.5 py-1.5 font-display text-base tracking-wide text-[#ff6b60] transition hover:bg-[#ff3b30] hover:text-white md:text-xl shadow-[0_0_15px_rgba(255,59,48,0.25)]"
+            >
+              <span className="flex h-3.5 w-5 items-center justify-center rounded-full bg-[#ff3b30] text-black">
+                <svg className="h-2.5 w-4" viewBox="0 0 28 16" fill="currentColor">
+                  <ellipse cx="14" cy="8" rx="13" ry="7" fill="#ff3b30" />
+                  <ellipse cx="14" cy="8" rx="5" ry="3" fill="#000000" />
+                </svg>
+              </span>
+              <span className="hidden sm:inline">ECHO PLAYER</span>
             </button>
           )}
 

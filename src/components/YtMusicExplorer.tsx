@@ -23,6 +23,7 @@ export interface YtMusicExplorerProps {
   onPlayNext?: (cues: Cue[]) => void;
   onAddToQueue?: (cues: Cue[], title?: string) => void;
   onBack: () => void;
+  onOpenEcho?: () => void;
   hasActivePlayback?: boolean;
   activeCue?: Cue | null;
 }
@@ -32,6 +33,7 @@ export const YtMusicExplorer: React.FC<YtMusicExplorerProps> = ({
   onPlayNext,
   onAddToQueue,
   onBack,
+  onOpenEcho,
   hasActivePlayback = false,
   activeCue = null,
 }) => {
@@ -588,6 +590,18 @@ export const YtMusicExplorer: React.FC<YtMusicExplorerProps> = ({
 
         {/* Right Status Actions */}
         <div className="flex items-center gap-2 shrink-0">
+          {onOpenEcho && (
+            <button
+              type="button"
+              onClick={onOpenEcho}
+              title="Open Echo Music with Auto Best Part of Song Picking"
+              className="flex items-center gap-1.5 rounded-full border border-[#ff3b30]/60 bg-[#ff3b30]/15 px-2.5 py-1 text-xs text-[#ff5b50] hover:bg-[#ff3b30] hover:text-white transition sm:px-3 sm:py-1.5 font-semibold"
+            >
+              <span>🔴</span>
+              <span className="hidden sm:inline">Echo Music</span>
+            </button>
+          )}
+
           {hasActivePlayback ? (
             <button
               type="button"
