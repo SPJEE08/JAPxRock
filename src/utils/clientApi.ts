@@ -985,25 +985,37 @@ export function searchYtMusicCatalog(
     .sort((a, b) => (b.fame ?? 2) - (a.fame ?? 2) || b.energy - a.energy)
     .slice(0, 40);
 
-  const matchedArtists = shelves.artists.filter((a) =>
-    terms.some((t) => a.name.toLowerCase().includes(t))
-  );
+  const matchedArtists = shelves.artists.filter((a) => {
+    const aName = a.name.toLowerCase();
+    if (aName.includes(q)) return true;
+    const meaningfulTerms = terms.filter((t) => t.length >= 3);
+    if (meaningfulTerms.length > 0) {
+      return meaningfulTerms.every((t) => aName.includes(t));
+    }
+    return false;
+  });
 
-  const matchedPlaylists = shelves.playlists.filter((p) =>
-    terms.some(
-      (t) =>
-        p.title.toLowerCase().includes(t) ||
-        p.subtitle.toLowerCase().includes(t)
-    )
-  );
+  const matchedPlaylists = shelves.playlists.filter((p) => {
+    const pTitle = p.title.toLowerCase();
+    const pSub = (p.subtitle || '').toLowerCase();
+    if (pTitle.includes(q) || pSub.includes(q)) return true;
+    const meaningfulTerms = terms.filter((t) => t.length >= 3);
+    if (meaningfulTerms.length > 0) {
+      return meaningfulTerms.every((t) => pTitle.includes(t) || pSub.includes(t));
+    }
+    return false;
+  });
 
-  const matchedAlbums = shelves.albums.filter((alb) =>
-    terms.some(
-      (t) =>
-        alb.title.toLowerCase().includes(t) ||
-        alb.artist.toLowerCase().includes(t)
-    )
-  );
+  const matchedAlbums = shelves.albums.filter((alb) => {
+    const aTitle = alb.title.toLowerCase();
+    const aArtist = alb.artist.toLowerCase();
+    if (aTitle.includes(q) || aArtist.includes(q)) return true;
+    const meaningfulTerms = terms.filter((t) => t.length >= 3);
+    if (meaningfulTerms.length > 0) {
+      return meaningfulTerms.every((t) => aTitle.includes(t) || aArtist.includes(t));
+    }
+    return false;
+  });
 
   return {
     songs: filter === 'all' || filter === 'songs' ? matchedSongs : [],
@@ -1248,6 +1260,40 @@ export async function searchGlobalLiveCatalog(
               tracks: [],
             })
           );
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // Also query live artists if requested
+  if (filter === 'all' || filter === 'artists') {
+    try {
+      const artistUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(
+        q
+      )}&entity=musicArtist&limit=6`;
+      const res = await fetch(artistUrl, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.results)) {
+          for (const art of data.results) {
+            const matchingTrack = liveTracks.find(
+              (t) => t.artist.toLowerCase() === (art.artistName || '').toLowerCase()
+            );
+            liveArtists.push({
+              id: `artist-${art.artistId || Math.random().toString(36).slice(2)}`,
+              name: art.artistName,
+              subtitle: `${art.primaryGenreName || 'Artist'} · Global Catalog`,
+              thumbnail:
+                matchingTrack?.art ||
+                'https://placehold.co/120x120/1f2937/ffffff?text=♫',
+              topTracks: liveTracks.filter(
+                (t) => t.artist.toLowerCase() === (art.artistName || '').toLowerCase()
+              ),
+              vibe: art.primaryGenreName,
+            });
+          }
         }
       }
     } catch {

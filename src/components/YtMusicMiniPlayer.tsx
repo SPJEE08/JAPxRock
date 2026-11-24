@@ -112,38 +112,38 @@ export const YtMusicMiniPlayer: React.FC<YtMusicMiniPlayerProps> = ({
       </div>
 
       {/* Main Mini-Player Bar Content */}
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5 md:px-8">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-1.5 px-2 py-2 sm:gap-3 sm:px-4 md:px-8">
         {/* Left: Clickable Now Playing Track Info (Expands to Full Player) */}
         <button
           type="button"
           onClick={onExpand}
           data-testid="mini-player-track-info"
           title="Click to expand full dual-deck player"
-          className="group flex min-w-0 flex-1 items-center gap-3 text-left"
+          className="group flex min-w-0 flex-1 items-center gap-2 text-left sm:gap-3"
         >
-          <div className="bg-brand-mix flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl font-display text-ink shadow-[0_0_20px_rgba(56,189,248,0.25)]">
-            <span className="text-[10px] font-bold tracking-wider uppercase">
-              DECK {state.live ?? 'A'}
+          <div className="bg-brand-mix flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-lg font-display text-ink shadow-[0_0_15px_rgba(56,189,248,0.25)] sm:h-11 sm:w-11 sm:rounded-xl md:h-12 md:w-12">
+            <span className="text-[8px] font-bold tracking-wider uppercase sm:text-[10px]">
+              {state.live ? `D:${state.live}` : 'DECK'}
             </span>
-            <span className="text-lg leading-none">
+            <span className="text-sm leading-none sm:text-base md:text-lg">
               {state.crossfading ? '⇄' : state.paused ? '⏸' : '▶'}
             </span>
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="truncate font-display text-2xl uppercase leading-tight text-white group-hover:text-sky">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <span className="truncate font-display text-base uppercase leading-tight text-white group-hover:text-sky sm:text-lg md:text-xl lg:text-2xl">
                 {liveCue?.title ?? 'Loading track…'}
               </span>
               {state.crossfading && (
-                <span className="shrink-0 font-mono text-xs font-semibold text-gold">
+                <span className="hidden shrink-0 font-mono text-[9px] font-semibold text-gold sm:inline sm:text-xs">
                   · MIXING
                 </span>
               )}
             </div>
-            <div className="truncate text-xs text-white/65 md:text-sm">
+            <div className="truncate text-[10px] text-white/65 sm:text-xs md:text-sm">
               <span>{liveCue?.artist}</span>
               {nextCue && (
-                <span className="text-white/45">
+                <span className="hidden text-white/45 sm:inline">
                   {' '}
                   · Next: <span className="text-sky">{nextCue.title}</span>
                 </span>
@@ -153,7 +153,7 @@ export const YtMusicMiniPlayer: React.FC<YtMusicMiniPlayerProps> = ({
         </button>
 
         {/* Center: Transport Controls (Prev / Play-Pause / Skip / Clock) */}
-        <div className="flex shrink-0 items-center gap-2 md:gap-3">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2 md:gap-3">
           <button
             type="button"
             onClick={() => engine.previous()}
@@ -165,7 +165,7 @@ export const YtMusicMiniPlayer: React.FC<YtMusicMiniPlayerProps> = ({
                 : 'Restart current hook'
             }
             data-testid="mini-player-prev-btn"
-            className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-white/25 font-display text-lg text-white transition hover:border-sky hover:text-sky disabled:opacity-35"
+            className="hidden h-8 w-8 items-center justify-center rounded-full border border-white/25 font-display text-sm text-white transition hover:border-sky hover:text-sky disabled:opacity-35 xs:flex sm:h-10 sm:w-10 sm:border-2 sm:text-base md:h-11 md:w-11 md:text-lg"
           >
             ⏮
           </button>
@@ -176,7 +176,7 @@ export const YtMusicMiniPlayer: React.FC<YtMusicMiniPlayerProps> = ({
             disabled={!liveCue}
             aria-label={state.paused ? 'Resume' : 'Pause'}
             data-testid="mini-player-playpause-btn"
-            className="bg-brand-mix flex h-12 w-12 items-center justify-center rounded-full font-display text-xl text-ink shadow-[0_4px_20px_rgba(250,204,21,0.3)] transition active:scale-95"
+            className="bg-brand-mix flex h-9 w-9 items-center justify-center rounded-full font-display text-base text-ink shadow-[0_4px_15px_rgba(250,204,21,0.3)] transition active:scale-95 sm:h-11 sm:w-11 sm:text-lg md:h-12 md:w-12 md:text-xl"
           >
             {state.paused ? '▶' : '⏸'}
           </button>
@@ -188,7 +188,7 @@ export const YtMusicMiniPlayer: React.FC<YtMusicMiniPlayerProps> = ({
             aria-label="Skip song"
             title="Skip to next song"
             data-testid="mini-player-skip-btn"
-            className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-white/25 font-display text-lg text-white transition hover:border-gold hover:text-gold disabled:opacity-35"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/25 font-display text-sm text-white transition hover:border-gold hover:text-gold disabled:opacity-35 sm:h-10 sm:w-10 sm:border-2 sm:text-base md:h-11 md:w-11 md:text-lg"
           >
             ⏭
           </button>
@@ -204,15 +204,16 @@ export const YtMusicMiniPlayer: React.FC<YtMusicMiniPlayerProps> = ({
         </div>
 
         {/* Right: Queue Drawer Toggle, Expand to Full Player & Close */}
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <button
             type="button"
             onClick={onOpenQueue}
             data-testid="mini-player-queue-btn"
             title="Open Queue Viewer & Add YouTube URL"
-            className="flex h-11 items-center gap-1.5 rounded-xl border-2 border-sky/60 bg-sky/10 px-3.5 font-display text-base tracking-wide text-sky transition hover:bg-sky hover:text-ink md:text-lg"
+            className="flex h-8 items-center gap-1 rounded-lg border border-sky/60 bg-sky/10 px-2 font-display text-xs tracking-wide text-sky transition hover:bg-sky hover:text-ink sm:h-10 sm:rounded-xl sm:border-2 sm:px-3 sm:text-sm md:h-11 md:px-3.5 md:text-base"
           >
-            <span>☰ QUEUE</span>
+            <span>☰</span>
+            <span className="hidden sm:inline">QUEUE</span>
             <span className="tabular-nums">({queue.length})</span>
           </button>
 
@@ -221,10 +222,10 @@ export const YtMusicMiniPlayer: React.FC<YtMusicMiniPlayerProps> = ({
             onClick={onExpand}
             data-testid="mini-player-expand-btn"
             title="Expand full-screen player"
-            className="flex h-11 items-center gap-1 rounded-xl border-2 border-gold/70 bg-gold/10 px-3.5 font-display text-base tracking-wide text-gold transition hover:bg-gold hover:text-ink md:text-lg"
+            className="flex h-8 items-center gap-1 rounded-lg border border-gold/70 bg-gold/10 px-2 font-display text-xs tracking-wide text-gold transition hover:bg-gold hover:text-ink sm:h-10 sm:rounded-xl sm:border-2 sm:px-3 sm:text-sm md:h-11 md:px-3.5 md:text-base"
           >
             <span>▲</span>
-            <span className="hidden sm:inline">EXPAND</span>
+            <span className="hidden md:inline">EXPAND</span>
           </button>
 
           <button
@@ -232,7 +233,7 @@ export const YtMusicMiniPlayer: React.FC<YtMusicMiniPlayerProps> = ({
             onClick={onExitSet}
             aria-label="Stop and end set"
             title="End set"
-            className="flex h-11 w-11 items-center justify-center rounded-xl border-2 border-white/20 text-white/60 transition hover:border-white hover:text-white"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/20 text-xs text-white/60 transition hover:border-white hover:text-white sm:h-10 sm:w-10 sm:rounded-xl sm:border-2 sm:text-sm md:h-11 md:w-11"
           >
             ✕
           </button>

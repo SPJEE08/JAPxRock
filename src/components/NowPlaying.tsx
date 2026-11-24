@@ -643,21 +643,6 @@ export const NowPlaying: React.FC<NowPlayingProps> = ({
     } else {
       setShowDragHint(false);
     }
-
-    // Heuristic context-aware DJ commentary (100% serverless, zero key required)
-    const commentary = getInstantDjCommentary({
-      currentTitle: liveCue.title,
-      currentArtist: liveCue.artist,
-      nextTitle: nextCue?.title,
-      nextArtist: nextCue?.artist,
-      timeMode: answers?.time ?? 'peak',
-    });
-    if (commentary) {
-      setTransientMsg({
-        text: `[DJ] ${commentary}`,
-        until: Date.now() + 8000,
-      });
-    }
   }, [liveCue?.song_id, nextCue?.song_id, answers?.time]);
 
   useEffect(() => {
@@ -1112,10 +1097,10 @@ export const NowPlaying: React.FC<NowPlayingProps> = ({
         />
       )}
 
-      {/* AGENT Commentary Ticker Bar */}
+      {/* Playback Status Bar */}
       <div className="relative z-10 my-2 shrink-0 flex items-center gap-3 sm:gap-5 border-y-2 border-white/15 py-1.5 sm:py-2.5 [@media(max-height:500px)]:hidden">
-        <span className="shrink-0 font-display text-[clamp(22px,2vw,36px)] leading-none tracking-wide text-gold">
-          AGENT
+        <span className="shrink-0 font-display text-[clamp(20px,1.8vw,32px)] leading-none tracking-wide text-gold">
+          STATUS
         </span>
         <AgentTicker text={agentCommentary} />
         {!state.finished && liveCue && (
