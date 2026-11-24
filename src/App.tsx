@@ -43,6 +43,7 @@ import {
 } from './components/SubViews';
 import { YtMusicMiniPlayer } from './components/YtMusicMiniPlayer';
 import { YtPlaylistImporter } from './components/YtPlaylistImporter';
+import { YtMusicExplorer } from './components/YtMusicExplorer';
 
 const TIME_CARDS: Array<{ id: TimeOfNight; label: string; hint: string }> = [
   {
@@ -169,7 +170,8 @@ type AppViewMode =
   | 'songs'
   | 'tune'
   | 'rea'
-  | 'sets';
+  | 'sets'
+  | 'ytmusic';
 
 export default function App() {
   const playableLibrary = useMemo(() => checkSeed(seedData).playable, []);
@@ -381,6 +383,40 @@ export default function App() {
             setView('review');
           }}
         />
+      ) : view === 'ytmusic' ? (
+        <YtMusicExplorer
+          onBack={navigateToHome}
+          onPlaySet={(cues) => {
+            const ans: FunnelAnswers = {
+              languages: ['hindi', 'punjabi'],
+              subtypes: [],
+              time: 'peak',
+              crowd: 'medium',
+            };
+            setAnswers(ans);
+            setSetlistResult({
+              cues,
+              fillers: new Set(),
+              note: 'Selected from YouTube Music catalog.',
+            });
+            handleApproveAndPlay(cues);
+          }}
+          onPlayNext={(cues) => {
+            if (hasActivePlayback && engineRef.current) {
+              engineRef.current.playNextBatch(cues);
+            } else {
+              handleApproveAndPlay(cues);
+            }
+          }}
+          onAddToQueue={(cues) => {
+            if (hasActivePlayback && engineRef.current) {
+              engineRef.current.appendToQueue(cues);
+            } else {
+              handleApproveAndPlay(cues);
+            }
+          }}
+          hasActivePlayback={hasActivePlayback}
+        />
       ) : view === 'review' && setlistResult && answers ? (
         <SetReview
           result={setlistResult}
@@ -398,6 +434,7 @@ export default function App() {
           onExit={handleEndPartyToSummary}
           onMinimize={navigateToHome}
           onOpenQueue={() => setQueueDrawerOpen(true)}
+          onOpenYtMusic={() => setView('ytmusic')}
           answers={answers}
           library={playableLibrary}
           showPlayerTile={showPlayerTile}
@@ -453,7 +490,15 @@ export default function App() {
               JAPxRock
             </button>
 
-            <div className="flex items-center gap-5">
+            <div className="flex items-center gap-3 sm:gap-5">
+              <button
+                onClick={() => setView('ytmusic')}
+                title="Search and play from YouTube Music library"
+                className="flex items-center gap-1.5 rounded-full border-2 border-red-500/80 bg-red-500/10 px-3 py-1 font-display text-base tracking-wide text-red-400 transition hover:bg-red-500 hover:text-white md:text-xl"
+              >
+                <span>🎵</span>
+                <span>YT MUSIC</span>
+              </button>
               {step === 0 && (
                 <>
                   <button
@@ -547,6 +592,13 @@ export default function App() {
 
               <p className="mt-12 text-lg text-white/40">
                 Plays through YouTube ·{' '}
+                <button
+                  onClick={() => setView('ytmusic')}
+                  className="font-semibold text-red-400 underline hover:text-white"
+                >
+                  YouTube Music Explorer
+                </button>{' '}
+                ·{' '}
                 <button
                   onClick={() => setView('songs')}
                   className="underline hover:text-white"

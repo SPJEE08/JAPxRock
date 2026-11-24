@@ -93,13 +93,13 @@ export const Deck: React.FC<DeckProps> = ({
       ref={sectionRef}
       data-slot={renderedSlot}
       data-testid={`deck-${id}`}
-      className="deck absolute left-0 top-0 flex w-full flex-col gap-[clamp(6px,1.6vh,24px)] md:w-[58%]"
+      className="deck absolute left-0 top-0 flex w-full flex-col gap-2 sm:gap-3 md:gap-[clamp(6px,1.6vh,24px)] md:w-[58%]"
       aria-hidden={!isLive}
     >
-      <header className="flex items-center gap-5 font-display text-[clamp(22px,min(2.4vw,4.4vh),40px)] leading-none tracking-wide">
+      <header className="flex items-center gap-3 font-display text-sm tracking-wide sm:text-base md:text-2xl">
         <span className="text-sky/75">DECK {id}</span>
         {isLive && status === 'live' ? (
-          <span className="flex items-center gap-3 text-gold">
+          <span className="flex items-center gap-2 text-gold">
             <span className="h-[0.55em] w-[0.55em] animate-pulse rounded-full bg-gold shadow-[0_0_14px_rgba(250,204,21,0.9)]" />
             LIVE{playFull ? ' · FULL' : ''}
           </span>
@@ -124,20 +124,12 @@ export const Deck: React.FC<DeckProps> = ({
           <h2
             ref={headingRef}
             key={`${cue?.song_id}-${isLive}`}
-            className={`font-display uppercase leading-[0.86] tracking-[-0.01em] [overflow-wrap:anywhere] ${
+            className={`font-display uppercase leading-[0.9] tracking-[-0.01em] [overflow-wrap:anywhere] ${
               isLive ? 'title-land' : ''
-            } ${
-              showPlayerTile
-                ? isLongTitle
-                  ? 'text-[clamp(48px,min(5.4vw,10.5vh),130px)]'
-                  : 'text-[clamp(60px,min(7.6vw,14vh),180px)]'
-                : isLongTitle
-                  ? 'text-[clamp(52px,min(6.6vw,12vh),150px)]'
-                  : 'text-[clamp(64px,min(9.5vw,17vh),210px)]'
-            }`}
+            } text-2xl sm:text-4xl md:text-5xl lg:text-7xl xl:text-8xl`}
             style={{
               display: '-webkit-box',
-              WebkitLineClamp: 3,
+              WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
             }}
@@ -145,7 +137,7 @@ export const Deck: React.FC<DeckProps> = ({
             {titleText}
           </h2>
           {cue && (
-            <p className="mt-[clamp(6px,1.6vh,24px)] truncate font-sans text-[clamp(24px,min(2.6vw,4.6vh),48px)] font-semibold leading-tight text-white/75">
+            <p className="mt-1 truncate font-sans text-sm font-semibold leading-tight text-white/75 sm:text-lg md:text-2xl">
               {cue.artist}
             </p>
           )}
@@ -154,7 +146,7 @@ export const Deck: React.FC<DeckProps> = ({
         {showPlayerTile && cue && slot !== 'cue' && (
           <div
             data-player-slot="true"
-            className="aspect-video w-[max(280px,19vw)] shrink-0 rounded-[20px]"
+            className="aspect-video w-[max(200px,16vw)] shrink-0 rounded-[16px] sm:w-[max(280px,19vw)]"
           />
         )}
       </div>

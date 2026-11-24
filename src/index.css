@@ -84,7 +84,7 @@ body {
 @media (max-width: 767px) {
   .deck[data-slot="cue"] {
     opacity: 0.36;
-    transform: translateY(calc(100cqh - 62%)) scale(0.62);
+    transform: translateY(42%) scale(0.62);
   }
   .deck[data-slot="out"] {
     opacity: 0;
@@ -95,7 +95,7 @@ body {
   .deck[data-slot="enter"] {
     opacity: 0;
     transition: none;
-    transform: translateY(100cqh) scale(0.62);
+    transform: translateY(100%) scale(0.62);
   }
 }
 

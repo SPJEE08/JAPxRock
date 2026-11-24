@@ -11,6 +11,7 @@ import {
   computeAdaptiveCrossfadeMs,
 } from './japSeed';
 import { resolveAlternateVideoIdsClient } from './clientApi';
+import { backgroundAudio } from './backgroundAudio';
 
 declare global {
   interface Window {
@@ -246,6 +247,16 @@ export class PlayerEngine {
     this.ready = true;
     this.tickTimer = setInterval(() => this.tick(), 200);
     this.log('Both players ready.');
+
+    backgroundAudio.init();
+    backgroundAudio.setHandlers({
+      onPlay: () => this.resume(),
+      onPause: () => this.pause(),
+      onPrevious: () => this.previous(),
+      onNext: () => this.skip(),
+      onSeek: (sec) => this.seek(sec),
+    });
+
     this.emit();
 
     if (this.pendingStartCues) {
@@ -329,6 +340,8 @@ export class PlayerEngine {
       this.finish('Queue is empty, nothing to play.');
       return;
     }
+
+    backgroundAudio.startKeepAlive();
 
     const deckA = this.decks.A;
     this.liveId = 'A';
@@ -494,6 +507,7 @@ export class PlayerEngine {
       // ignore
     }
     this.paused = true;
+    backgroundAudio.pauseKeepAlive();
     const at = this.getDeckTime(live);
     this.log(`PAUSE ${live.cue.song_id} at ${at.toFixed(1)}s`);
     this.event({ type: 'paused', cue: live.cue, at });
@@ -505,6 +519,7 @@ export class PlayerEngine {
     const live = this.liveDeck();
     if (!this.paused || !live?.cue) return;
     this.paused = false;
+    backgroundAudio.resumeKeepAlive();
     live.clockLastTickMs = performance.now();
     try {
       live.player?.playVideo?.();
@@ -741,6 +756,7 @@ export class PlayerEngine {
 
   destroy() {
     this.destroyed = true;
+    backgroundAudio.pauseKeepAlive();
     if (this.tickTimer) clearInterval(this.tickTimer);
     if (this.fadeTimer) clearInterval(this.fadeTimer);
     for (const d of Object.values(this.decks)) {
@@ -1066,6 +1082,12 @@ export class PlayerEngine {
           live.clockPositionSec + dt
         );
       }
+      backgroundAudio.updateMediaSession(
+        live.cue,
+        this.paused,
+        live.clockPositionSec,
+        live.cue.duration_sec
+      );
     }
 
     if (this.crossfading || this.awaitingStart || this.pendingHandoff) return;

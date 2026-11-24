@@ -7,6 +7,9 @@ import type {
   PlayedTrackRecord,
   SavedSet,
   TimeOfNight,
+  YtMusicAlbumItem,
+  YtMusicArtistItem,
+  YtMusicPlaylistItem,
 } from '../types/jap';
 import {
   detectOptimalHookWindow,
@@ -625,7 +628,6 @@ const LEGACY_SETS_STORAGE_KEY = 'naux.savedSets';
 const PLAYLISTS_STORAGE_KEY = 'japxrock.customPlaylists';
 const REQUESTS_STORAGE_KEY = 'japxrock.songRequests';
 const TUNE_STORAGE_KEY = 'japxrock.tuneVotes';
-const API_KEY_STORAGE_KEY = 'japxrock.geminiApiKey';
 
 export function getSavedSets(): SavedSet[] {
   try {
@@ -810,27 +812,245 @@ export function saveGuestRequestClient(text: string): boolean {
 }
 
 // ----------------------------------------------------------------------
-// Client-Side AI DJ Commentary Engine (Heuristic + Optional User Gemini API)
+// YouTube Music Direct Library Catalog, Shelves, Search & Auto-Recommendations
 // ----------------------------------------------------------------------
 
-export function getUserGeminiApiKey(): string {
-  return localStorage.getItem(API_KEY_STORAGE_KEY) || '';
+export function getYtMusicFeaturedShelves(): {
+  playlists: YtMusicPlaylistItem[];
+  artists: YtMusicArtistItem[];
+  albums: YtMusicAlbumItem[];
+} {
+  const lib = getClientLibrary();
+
+  const playlists: YtMusicPlaylistItem[] = [
+    {
+      id: 'PL4fGSI1pDJn6puJdseH2Rt9sMvt9E2M4i',
+      playlistId: 'PL4fGSI1pDJn6puJdseH2Rt9sMvt9E2M4i',
+      title: 'YouTube Top 100 Global',
+      subtitle: 'Official Live YouTube Music Charts (Weekly)',
+      thumbnail: 'https://i.ytimg.com/vi/CEbB9kdu8ng/hqdefault.jpg',
+      trackCount: 50,
+      vibe: 'party',
+      lang: 'global',
+    },
+    {
+      id: 'PLMC9KNkIncKtPzgY-5rmhvj7fax8fdxoj',
+      playlistId: 'PLMC9KNkIncKtPzgY-5rmhvj7fax8fdxoj',
+      title: 'Global Pop Anthems',
+      subtitle: 'Lady Gaga · Bruno Mars · ROSÉ · Dua Lipa',
+      thumbnail: 'https://i.ytimg.com/vi/kPa7bsKwL-c/hqdefault.jpg',
+      trackCount: 50,
+      vibe: 'pop',
+      lang: 'english',
+    },
+    {
+      id: 'jap-preset:punjabi-club',
+      title: 'Punjabi & Desi Club Bangers',
+      subtitle: 'AP Dhillon, Karan Aujla, Diljit Dosanjh & Shubh',
+      thumbnail: 'https://i.ytimg.com/vi/aoIhamvZKdQ/hqdefault.jpg',
+      trackCount: lib.filter((c) => c.language === 'punjabi' && c.energy >= 7).length,
+      tracks: lib.filter((c) => c.language === 'punjabi' && c.energy >= 7).slice(0, 30),
+      vibe: 'club',
+      lang: 'punjabi',
+    },
+    {
+      id: 'jap-preset:bollywood-peak',
+      title: 'Bollywood Peak Hour Dancefloor',
+      subtitle: 'High-energy Hindi party hooks & club remixes',
+      thumbnail: 'https://i.ytimg.com/vi/gvyUuxdRdAk/hqdefault.jpg',
+      trackCount: lib.filter((c) => c.language === 'hindi' && c.subtype === 'dance').length,
+      tracks: lib.filter((c) => c.language === 'hindi' && c.subtype === 'dance').slice(0, 30),
+      vibe: 'dance',
+      lang: 'hindi',
+    },
+    {
+      id: 'jap-preset:desi-hiphop',
+      title: 'Desi Hip-Hop & Cypher Anthems',
+      subtitle: 'DIVINE, Seedhe Maut, KR$NA, Raftaar & Hanumankind',
+      thumbnail: 'https://i.ytimg.com/vi/fcnDmrtj6Sk/hqdefault.jpg',
+      trackCount: lib.filter((c) => c.subtype === 'hiphop').length,
+      tracks: lib.filter((c) => c.subtype === 'hiphop').slice(0, 25),
+      vibe: 'hiphop',
+      lang: 'hindi',
+    },
+    {
+      id: 'jap-preset:bollywood-retro',
+      title: '90s & 2000s Bollywood Nostalgia',
+      subtitle: 'Classic sing-along nostalgic retro party hooks',
+      thumbnail: 'https://i.ytimg.com/vi/CEbB9kdu8ng/hqdefault.jpg',
+      trackCount: lib.filter((c) => c.subtype === 'retro').length,
+      tracks: lib.filter((c) => c.subtype === 'retro').slice(0, 25),
+      vibe: 'retro',
+      lang: 'hindi',
+    },
+  ];
+
+  const popularArtistNames = [
+    'Diljit Dosanjh',
+    'AP Dhillon',
+    'Karan Aujla',
+    'Arijit Singh',
+    'Badshah',
+    'DIVINE',
+    'Seedhe Maut',
+    'Lady Gaga',
+    'Bruno Mars',
+    'The Weeknd',
+    'Dua Lipa',
+    'Shubh',
+    'Sidhu Moose Wala',
+  ];
+
+  const artists: YtMusicArtistItem[] = popularArtistNames
+    .map((name): YtMusicArtistItem | null => {
+      const artistTracks = lib.filter(
+        (c) =>
+          c.artist.toLowerCase().includes(name.toLowerCase()) ||
+          name.toLowerCase().includes(c.artist.toLowerCase())
+      );
+      if (artistTracks.length === 0) return null;
+      const lead = artistTracks[0];
+      return {
+        id: `artist-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+        name,
+        subtitle: `${artistTracks.length} party tracks · ${lead.language.toUpperCase()}`,
+        thumbnail: lead.art || `https://i.ytimg.com/vi/${lead.youtube_ids[0]}/hqdefault.jpg`,
+        topTracks: artistTracks.slice(0, 25),
+        vibe: lead.vibe,
+      };
+    })
+    .filter((a): a is YtMusicArtistItem => a !== null);
+
+  const albumDefs = [
+    { title: 'Making Memories', artist: 'Karan Aujla', year: '2023' },
+    { title: 'MoonChild Era', artist: 'Diljit Dosanjh', year: '2021' },
+    { title: 'Two Hearts Never Break The Same', artist: 'AP Dhillon', year: '2022' },
+    { title: 'Starboy', artist: 'The Weeknd', year: '2016' },
+    { title: 'Future Nostalgia', artist: 'Dua Lipa', year: '2020' },
+    { title: 'Punya Paap', artist: 'DIVINE', year: '2020' },
+  ];
+
+  const albums: YtMusicAlbumItem[] = albumDefs
+    .map((def): YtMusicAlbumItem | null => {
+      const albumTracks = lib.filter(
+        (c) =>
+          c.artist.toLowerCase().includes(def.artist.toLowerCase()) ||
+          c.title.toLowerCase().includes(def.title.toLowerCase())
+      );
+      if (albumTracks.length === 0) return null;
+      const lead = albumTracks[0];
+      return {
+        id: `album-${def.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+        title: def.title,
+        artist: def.artist,
+        year: def.year,
+        thumbnail: lead.art || `https://i.ytimg.com/vi/${lead.youtube_ids[0]}/hqdefault.jpg`,
+        tracks: albumTracks.slice(0, 15),
+      };
+    })
+    .filter((alb): alb is YtMusicAlbumItem => alb !== null);
+
+  return { playlists, artists, albums };
 }
 
-export function setUserGeminiApiKey(key: string) {
-  if (key) {
-    localStorage.setItem(API_KEY_STORAGE_KEY, key.trim());
-  } else {
-    localStorage.removeItem(API_KEY_STORAGE_KEY);
+export function searchYtMusicCatalog(
+  query: string,
+  filter: 'all' | 'songs' | 'playlists' | 'albums' | 'artists' = 'all'
+): {
+  songs: Cue[];
+  artists: YtMusicArtistItem[];
+  playlists: YtMusicPlaylistItem[];
+  albums: YtMusicAlbumItem[];
+} {
+  const lib = getClientLibrary();
+  const q = query.trim().toLowerCase();
+  const shelves = getYtMusicFeaturedShelves();
+
+  if (!q) {
+    return {
+      songs: lib.filter((c) => (c.fame ?? 2) >= 3 && c.energy >= 7).slice(0, 30),
+      artists: shelves.artists,
+      playlists: shelves.playlists,
+      albums: shelves.albums,
+    };
   }
+
+  const terms = q.split(/\s+/).filter(Boolean);
+
+  const matchedSongs = lib
+    .filter((c) => {
+      const hay = `${c.title} ${c.artist} ${c.vibe} ${c.language} ${c.subtype}`.toLowerCase();
+      return terms.every((t) => hay.includes(t));
+    })
+    .sort((a, b) => (b.fame ?? 2) - (a.fame ?? 2) || b.energy - a.energy)
+    .slice(0, 40);
+
+  const matchedArtists = shelves.artists.filter((a) =>
+    terms.some((t) => a.name.toLowerCase().includes(t))
+  );
+
+  const matchedPlaylists = shelves.playlists.filter((p) =>
+    terms.some(
+      (t) =>
+        p.title.toLowerCase().includes(t) ||
+        p.subtitle.toLowerCase().includes(t)
+    )
+  );
+
+  const matchedAlbums = shelves.albums.filter((alb) =>
+    terms.some(
+      (t) =>
+        alb.title.toLowerCase().includes(t) ||
+        alb.artist.toLowerCase().includes(t)
+    )
+  );
+
+  return {
+    songs: filter === 'all' || filter === 'songs' ? matchedSongs : [],
+    artists: filter === 'all' || filter === 'artists' ? matchedArtists : [],
+    playlists: filter === 'all' || filter === 'playlists' ? matchedPlaylists : [],
+    albums: filter === 'all' || filter === 'albums' ? matchedAlbums : [],
+  };
 }
 
 /**
- * Generates charismatic, context-aware AI DJ transition commentary.
- * If user saved an optional free Gemini API key, calls the Google Gemini REST API directly.
- * Otherwise, uses a rich heuristic DJ generator that requires NO API keys.
+ * Generates companion recommendations similar to YouTube Music radio / Up Next algorithms:
+ * Matches language, subtype, energy +/-2, and tempo +/-25 BPM.
  */
-export async function getClientDjCommentary(params: {
+export function getYtMusicSimilarRecommendations(seedCue: Cue, count = 12): Cue[] {
+  const lib = getClientLibrary();
+  const pool = lib.filter(
+    (c) =>
+      c.song_id !== seedCue.song_id &&
+      (c.artist.toLowerCase() === seedCue.artist.toLowerCase() ||
+        (c.language === seedCue.language && c.subtype === seedCue.subtype)) &&
+      Math.abs(c.energy - seedCue.energy) <= 2
+  );
+
+  const extendedPool =
+    pool.length >= count
+      ? pool
+      : [
+          ...pool,
+          ...lib.filter(
+            (c) =>
+              c.song_id !== seedCue.song_id &&
+              c.language === seedCue.language &&
+              Math.abs(c.energy - seedCue.energy) <= 2
+          ),
+        ];
+
+  const map = new Map<string, Cue>();
+  for (const c of extendedPool) {
+    if (!map.has(c.song_id)) map.set(c.song_id, c);
+  }
+  return Array.from(map.values()).slice(0, count);
+}
+
+/**
+ * Instant generative DJ transition commentary (100% offline, zero API keys required).
+ */
+export function getInstantDjCommentary(params: {
   currentTitle?: string;
   currentArtist?: string;
   nextTitle?: string;
@@ -838,41 +1058,7 @@ export async function getClientDjCommentary(params: {
   timeMode?: TimeOfNight;
   currentEnergy?: number;
   nextEnergy?: number;
-}): Promise<string> {
-  const userKey = getUserGeminiApiKey();
-
-  // If user provided their own key, call Gemini API directly from browser
-  if (userKey && (params.currentTitle || params.nextTitle)) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3500);
-      const prompt = `You are JAPxRock, an elite charismatic house party DJ AI running the aux. In one punchy sentence (max 15 words, all-caps party hype), announce this mix from "${params.currentTitle || 'the current banger'}" into "${params.nextTitle || 'the next track'}" by ${params.nextArtist || 'up next'} during the ${params.timeMode || 'peak'} hour. No hashtags.`;
-
-      const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(
-          userKey
-        )}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-          }),
-          signal: controller.signal,
-        }
-      );
-      clearTimeout(timeout);
-      if (resp.ok) {
-        const result = await resp.json();
-        const text = result?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (text) return `[AI DJ] ${text.replace(/^["']|["']$/g, '')}`;
-      }
-    } catch {
-      // Fall back below
-    }
-  }
-
-  // Generative Heuristic Party DJ Engine (Zero API Key Required)
+}): string {
   const next = params.nextTitle || 'next track';
   const artist = params.nextArtist ? ` by ${params.nextArtist}` : '';
   const energyDelta = (params.nextEnergy ?? 7) - (params.currentEnergy ?? 7);

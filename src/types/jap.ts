@@ -135,3 +135,33 @@ export interface CustomPlaylist {
   sourceUrl?: string;
   tags?: string[];
 }
+
+export interface YtMusicPlaylistItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  thumbnail: string;
+  trackCount: number;
+  playlistId?: string;
+  tracks?: Cue[];
+  vibe?: string;
+  lang?: string;
+}
+
+export interface YtMusicArtistItem {
+  id: string;
+  name: string;
+  subtitle: string;
+  thumbnail: string;
+  topTracks: Cue[];
+  vibe?: string;
+}
+
+export interface YtMusicAlbumItem {
+  id: string;
+  title: string;
+  artist: string;
+  year?: string;
+  thumbnail: string;
+  tracks: Cue[];
+}

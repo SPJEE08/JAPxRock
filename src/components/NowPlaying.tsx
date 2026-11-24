@@ -16,10 +16,8 @@ import {
 } from '../utils/japSeed';
 import {
   analyzeYouTubeInputClient,
-  getClientDjCommentary,
-  getUserGeminiApiKey,
+  getInstantDjCommentary,
   saveGuestRequestClient,
-  setUserGeminiApiKey,
 } from '../utils/clientApi';
 import type { PlayerEngine } from '../utils/playerEngine';
 import { fitsSubtype, LANGUAGES, MIN_LANGUAGE_SONGS } from '../utils/setlistBuilder';
@@ -286,93 +284,6 @@ const ChangeVibeModal: React.FC<ChangeVibeModalProps> = ({
   );
 };
 
-const DjSettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [key, setKey] = useState(() => getUserGeminiApiKey());
-  const [saved, setSaved] = useState(false);
-
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    setUserGeminiApiKey(key.trim());
-    setSaved(true);
-    setTimeout(() => {
-      setSaved(false);
-      onClose();
-    }, 1200);
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/75 p-4 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-lg rounded-3xl border-2 border-white/20 bg-ink p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
-          <h2 className="font-display text-2xl uppercase tracking-wide text-lime">
-            ✨ AI DJ Settings (Optional)
-          </h2>
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 text-white/60 hover:text-white"
-          >
-            ✕
-          </button>
-        </div>
-        <p className="mt-3 text-sm text-white/70">
-          JAPxRock comes with a context-aware mathematical DJ commentary engine built right in. No external server or API key is required.
-        </p>
-        <p className="mt-2 text-xs text-white/50">
-          If you want live Google Gemini AI commentary, paste your own free Gemini API key below. It stays stored locally in your browser&apos;s localStorage.
-        </p>
-
-        <form onSubmit={handleSave} className="mt-4">
-          <label className="block font-mono text-xs uppercase text-gold">
-            Google Gemini API Key
-          </label>
-          <input
-            type="password"
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            placeholder="AIzaSy..."
-            className="mt-1 h-11 w-full rounded-xl border border-white/20 bg-white/5 px-3 font-mono text-sm text-white focus:border-lime focus:outline-none"
-          />
-          <div className="mt-4 flex items-center justify-between">
-            {key ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setKey('');
-                  setUserGeminiApiKey('');
-                }}
-                className="text-xs text-gold hover:underline"
-              >
-                Clear Key (Use Heuristic DJ)
-              </button>
-            ) : <span />}
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-xl border border-white/20 px-4 py-2 font-display text-sm text-white/70 hover:border-white hover:text-white"
-              >
-                CLOSE
-              </button>
-              <button
-                type="submit"
-                className="rounded-xl bg-lime px-5 py-2 font-display text-sm text-ink hover:bg-lime/90"
-              >
-                {saved ? '✓ SAVED' : 'SAVE KEY'}
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
 
 interface PlayNextModalProps {
   library: Cue[];
@@ -601,12 +512,12 @@ const ActionDeckButton: React.FC<{
   <button
     onClick={onClick}
     disabled={disabled}
-    className={`h-[clamp(84px,14vh,170px)] flex-1 rounded-[28px] font-display text-[clamp(44px,5vw,88px)] leading-none tracking-wide transition active:scale-[0.97] max-md:h-[76px] max-md:rounded-[22px] max-md:text-[30px] [@media(max-height:500px)]:h-[60px] [@media(max-height:500px)]:text-[36px] ${
+    className={`h-[clamp(54px,8vh,96px)] flex-1 rounded-2xl sm:rounded-[24px] font-display text-[clamp(24px,3.2vw,52px)] leading-none tracking-wide transition active:scale-[0.97] ${
       primary
         ? 'bg-brand-mix text-ink shadow-[0_10px_36px_rgba(56,189,248,0.25)] disabled:opacity-40'
         : active
-          ? 'border-4 border-gold text-gold'
-          : 'border-4 border-white/85 text-white hover:border-sky disabled:border-white/25 disabled:text-white/30'
+          ? 'border-2 sm:border-4 border-gold text-gold'
+          : 'border-2 sm:border-4 border-white/85 text-white hover:border-sky disabled:border-white/25 disabled:text-white/30'
     }`}
   >
     {children}
@@ -621,6 +532,7 @@ export interface NowPlayingProps {
   onExit: () => void;
   onMinimize: () => void;
   onOpenQueue: () => void;
+  onOpenYtMusic?: () => void;
   answers: FunnelAnswers | null;
   library: Cue[];
   showPlayerTile: boolean;
@@ -637,6 +549,7 @@ export const NowPlaying: React.FC<NowPlayingProps> = ({
   onExit,
   onMinimize,
   onOpenQueue,
+  onOpenYtMusic,
   answers,
   library,
   showPlayerTile,
@@ -647,7 +560,6 @@ export const NowPlaying: React.FC<NowPlayingProps> = ({
   const [changeVibeOpen, setChangeVibeOpen] = useState(false);
   const [playNextOpen, setPlayNextOpen] = useState(false);
   const [showMathHud, setShowMathHud] = useState(false);
-  const [djSettingsOpen, setDjSettingsOpen] = useState(false);
 
   const [pos, setPos] = useState<{ seconds: number; duration: number } | null>(
     null
@@ -732,28 +644,21 @@ export const NowPlaying: React.FC<NowPlayingProps> = ({
       setShowDragHint(false);
     }
 
-    // Call client-side context-aware DJ engine (runs local heuristic or optional user Gemini key)
-    let active = true;
-    getClientDjCommentary({
+    // Heuristic context-aware DJ commentary (100% serverless, zero key required)
+    const commentary = getInstantDjCommentary({
       currentTitle: liveCue.title,
       currentArtist: liveCue.artist,
       nextTitle: nextCue?.title,
       nextArtist: nextCue?.artist,
       timeMode: answers?.time ?? 'peak',
-    })
-      .then((commentary) => {
-        if (active && commentary) {
-          setTransientMsg({
-            text: `[AI DJ] ${commentary}`,
-            until: Date.now() + 8000,
-          });
-        }
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [liveCue?.song_id, nextCue?.song_id]);
+    });
+    if (commentary) {
+      setTransientMsg({
+        text: `[DJ] ${commentary}`,
+        until: Date.now() + 8000,
+      });
+    }
+  }, [liveCue?.song_id, nextCue?.song_id, answers?.time]);
 
   useEffect(() => {
     return () => {
@@ -937,7 +842,7 @@ export const NowPlaying: React.FC<NowPlayingProps> = ({
     <main
       data-paused={isPaused ? 'true' : undefined}
       data-testid="now-playing-view"
-      className="relative flex h-dvh flex-col overflow-clip px-[4vw] pb-[3vh] pt-[3vh]"
+      className="relative flex min-h-dvh flex-col justify-between overflow-x-hidden p-3 sm:p-5 md:p-8"
     >
       {/* Energy-coupled radial Light Blue + Yellow glow */}
       <div
@@ -946,7 +851,7 @@ export const NowPlaying: React.FC<NowPlayingProps> = ({
       />
 
       {/* Top Navigation & Telemetry Controls */}
-      <div className="relative z-30 flex items-center gap-[1.5vw] font-display text-[clamp(26px,2.4vw,40px)] leading-none tracking-wide">
+      <div className="relative z-30 shrink-0 flex items-center gap-[1.5vw] font-display text-[clamp(24px,2.4vw,40px)] leading-none tracking-wide">
         <button
           onClick={onMinimize}
           className="text-brand-mix shrink-0"
@@ -967,6 +872,20 @@ export const NowPlaying: React.FC<NowPlayingProps> = ({
         )}
 
         <div className="ml-auto flex shrink-0 items-center gap-2 md:gap-2.5">
+          {/* YouTube Music Explorer Dedicated Section Button */}
+          {onOpenYtMusic && (
+            <button
+              type="button"
+              onClick={onOpenYtMusic}
+              data-testid="open-yt-music-btn"
+              title="Open YouTube Music Catalog & Explorer"
+              className="flex items-center gap-1.5 rounded-full border-2 border-red-500/80 bg-red-500/10 px-3.5 py-1.5 font-display text-base tracking-wide text-red-400 transition hover:bg-red-500 hover:text-white md:text-xl"
+            >
+              <span>🎵</span>
+              <span className="hidden sm:inline">YT MUSIC</span>
+            </button>
+          )}
+
           {/* Open Live Queue & Sequence Editor */}
           <button
             type="button"
@@ -1013,19 +932,6 @@ export const NowPlaying: React.FC<NowPlayingProps> = ({
             }`}
           >
             VIDEO
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setDjSettingsOpen(true)}
-            title="AI DJ Settings (Optionally configure your free Gemini API key)"
-            className={`hidden rounded-full border-2 px-3.5 py-1.5 font-display text-base tracking-wide transition sm:inline-flex md:text-xl ${
-              djSettingsOpen
-                ? 'border-lime bg-lime text-ink'
-                : 'border-white/20 text-white/60 hover:border-lime hover:text-lime'
-            }`}
-          >
-            ✨ AI DJ
           </button>
 
           {pos && liveCue && !state.finished && (
@@ -1100,9 +1006,6 @@ export const NowPlaying: React.FC<NowPlayingProps> = ({
       )}
 
       {/* Modals */}
-      {djSettingsOpen && (
-        <DjSettingsModal onClose={() => setDjSettingsOpen(false)} />
-      )}
       {playNextOpen && (
         <PlayNextModal
           library={library}
@@ -1210,8 +1113,8 @@ export const NowPlaying: React.FC<NowPlayingProps> = ({
       )}
 
       {/* AGENT Commentary Ticker Bar */}
-      <div className="relative z-10 mb-[3vh] flex items-center gap-5 border-y-2 border-white/15 py-[1.6vh] [@media(max-height:500px)]:hidden">
-        <span className="shrink-0 font-display text-[clamp(26px,2.2vw,38px)] leading-none tracking-wide text-gold">
+      <div className="relative z-10 my-2 shrink-0 flex items-center gap-3 sm:gap-5 border-y-2 border-white/15 py-1.5 sm:py-2.5 [@media(max-height:500px)]:hidden">
+        <span className="shrink-0 font-display text-[clamp(22px,2vw,36px)] leading-none tracking-wide text-gold">
           AGENT
         </span>
         <AgentTicker text={agentCommentary} />
@@ -1257,71 +1160,73 @@ export const NowPlaying: React.FC<NowPlayingProps> = ({
       </div>
 
       {/* Primary Deck Controls (← PREV / SKIP / PLAY FULL / RESUME / NEW SET) */}
-      {state.finished ? (
-        <div className="relative z-10 flex gap-[2vw]">
-          <ActionDeckButton onClick={onNewSet} primary>
-            NEW SET
-          </ActionDeckButton>
-        </div>
-      ) : isPaused ? (
-        <div className="relative z-10 flex gap-[2vw]">
-          <ActionDeckButton
-            onClick={() => engine.previous()}
-            disabled={!liveCue || state.crossfading}
-          >
-            ← PREV
-          </ActionDeckButton>
-          <ActionDeckButton onClick={() => engine.resume()} primary>
-            <span className="inline-flex items-center gap-[0.35em]">
-              <span
-                className="inline-flex h-[0.62em] w-[0.62em]"
-                aria-hidden="true"
-              >
-                <PlayIcon />
-              </span>
-              RESUME
-            </span>
-          </ActionDeckButton>
-        </div>
-      ) : (
-        <div className="relative z-10 flex gap-[1.5vw]">
-          <button
-            type="button"
-            onClick={() => engine.previous()}
-            disabled={!liveCue || state.crossfading}
-            data-testid="deck-prev-button"
-            title={
-              state.previousCue
-                ? `Back to previous song: ${state.previousCue.title} (${state.previousCue.artist})`
-                : 'Restart current song hook from the entry point'
-            }
-            className="group relative flex h-[clamp(84px,14vh,170px)] flex-1 flex-col items-center justify-center rounded-[28px] border-4 border-sky/85 px-3 font-display leading-none tracking-wide text-sky transition hover:border-gold hover:bg-sky/10 hover:text-gold active:scale-[0.97] disabled:border-white/25 disabled:text-white/30 max-md:h-[76px] max-md:rounded-[22px] [@media(max-height:500px)]:h-[60px]"
-          >
-            <span className="text-[clamp(36px,4.4vw,80px)] max-md:text-[26px] [@media(max-height:500px)]:text-[32px]">
+      <div className="relative z-30 mt-auto shrink-0 pt-2 pb-1">
+        {state.finished ? (
+          <div className="flex gap-2 sm:gap-4">
+            <ActionDeckButton onClick={onNewSet} primary>
+              NEW SET
+            </ActionDeckButton>
+          </div>
+        ) : isPaused ? (
+          <div className="flex gap-2 sm:gap-4">
+            <ActionDeckButton
+              onClick={() => engine.previous()}
+              disabled={!liveCue || state.crossfading}
+            >
               ← PREV
-            </span>
-            {state.previousCue && (
-              <span className="mt-1 max-w-[90%] truncate font-sans text-xs font-medium tracking-normal text-white/70 group-hover:text-white max-md:hidden">
-                {state.previousCue.title}
+            </ActionDeckButton>
+            <ActionDeckButton onClick={() => engine.resume()} primary>
+              <span className="inline-flex items-center gap-[0.35em]">
+                <span
+                  className="inline-flex h-[0.62em] w-[0.62em]"
+                  aria-hidden="true"
+                >
+                  <PlayIcon />
+                </span>
+                RESUME
               </span>
-            )}
-          </button>
-          <ActionDeckButton
-            onClick={() => engine.skip()}
-            primary
-            disabled={!liveCue || state.crossfading}
-          >
-            SKIP →
-          </ActionDeckButton>
-          <ActionDeckButton
-            onClick={() => engine.playFullCurrent()}
-            active={isPlayingFull}
-            disabled={!liveCue || isPlayingFull}
-          >
-            {isPlayingFull ? 'PLAYING FULL' : 'PLAY FULL'}
-          </ActionDeckButton>
-        </div>
-      )}
+            </ActionDeckButton>
+          </div>
+        ) : (
+          <div className="flex gap-2 sm:gap-3 md:gap-4">
+            <button
+              type="button"
+              onClick={() => engine.previous()}
+              disabled={!liveCue || state.crossfading}
+              data-testid="deck-prev-button"
+              title={
+                state.previousCue
+                  ? `Back to previous song: ${state.previousCue.title} (${state.previousCue.artist})`
+                  : 'Restart current song hook from the entry point'
+              }
+              className="group relative flex h-[clamp(54px,8vh,96px)] flex-1 flex-col items-center justify-center rounded-2xl sm:rounded-[24px] border-2 sm:border-4 border-sky/85 px-2 sm:px-3 font-display leading-none tracking-wide text-sky transition hover:border-gold hover:bg-sky/10 hover:text-gold active:scale-[0.97] disabled:border-white/25 disabled:text-white/30"
+            >
+              <span className="text-[clamp(20px,3.2vw,48px)]">
+                ← PREV
+              </span>
+              {state.previousCue && (
+                <span className="mt-0.5 max-w-[90%] truncate font-sans text-[11px] sm:text-xs font-medium tracking-normal text-white/70 group-hover:text-white max-md:hidden">
+                  {state.previousCue.title}
+                </span>
+              )}
+            </button>
+            <ActionDeckButton
+              onClick={() => engine.skip()}
+              primary
+              disabled={!liveCue || state.crossfading}
+            >
+              SKIP →
+            </ActionDeckButton>
+            <ActionDeckButton
+              onClick={() => engine.playFullCurrent()}
+              active={isPlayingFull}
+              disabled={!liveCue || isPlayingFull}
+            >
+              {isPlayingFull ? 'PLAYING FULL' : 'PLAY FULL'}
+            </ActionDeckButton>
+          </div>
+        )}
+      </div>
     </main>
   );
 };
