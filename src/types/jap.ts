@@ -40,6 +40,10 @@ export interface Cue {
   vibe: string;
   art?: string;
   hookMath?: HookAnalysisMetrics;
+  isLiveCatalog?: boolean;
+  albumTitle?: string;
+  releaseYear?: string;
+  previewUrl?: string;
 }
 
 export interface FunnelAnswers {

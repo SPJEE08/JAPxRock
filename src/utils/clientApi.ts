@@ -1087,3 +1087,308 @@ export function getInstantDjCommentary(params: {
   ];
   return standardLines[Math.floor(Math.random() * standardLines.length)];
 }
+
+/**
+ * Real-time YouTube search suggestions directly from Google's suggestion endpoint via JSONP.
+ * 100% serverless, zero API key required, zero CORS issues in all browsers.
+ */
+export function fetchYouTubeSuggestionsClient(query: string): Promise<string[]> {
+  if (typeof window === 'undefined' || !query.trim()) return Promise.resolve([]);
+  return new Promise((resolve) => {
+    const cbName = `__yt_suggest_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    const script = document.createElement('script');
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve([]);
+    }, 2500);
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      delete (window as any)[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    };
+
+    (window as any)[cbName] = (data: any) => {
+      cleanup();
+      if (Array.isArray(data) && Array.isArray(data[1])) {
+        const suggestions = data[1].map((item: any) =>
+          typeof item === 'string' ? item : item[0]
+        );
+        resolve(suggestions.filter(Boolean));
+      } else {
+        resolve([]);
+      }
+    };
+
+    script.src = `https://suggestqueries.google.com/complete/search?client=youtube&ds=yt&q=${encodeURIComponent(
+      query.trim()
+    )}&jsonp=${cbName}`;
+    script.onerror = () => {
+      cleanup();
+      resolve([]);
+    };
+    document.head.appendChild(script);
+  });
+}
+
+/**
+ * Searches the global live music catalog (Apple Music / iTunes open API) for songs, albums, and artists.
+ * Automatically attempts to correlate with our curated database of 1,346 party songs.
+ */
+export async function searchGlobalLiveCatalog(
+  query: string,
+  filter: 'all' | 'songs' | 'playlists' | 'albums' | 'artists' = 'all'
+): Promise<{
+  songs: Cue[];
+  artists: YtMusicArtistItem[];
+  albums: YtMusicAlbumItem[];
+}> {
+  const q = query.trim();
+  if (!q) return { songs: [], artists: [], albums: [] };
+
+  const lib = getClientLibrary();
+  const searchTerms = q.toLowerCase().split(/\s+/).filter(Boolean);
+
+  // 1. Check local seed library first for exact/fuzzy matches
+  const localMatched = lib
+    .filter((c) => {
+      const hay = `${c.title} ${c.artist} ${c.language} ${c.subtype}`.toLowerCase();
+      return searchTerms.every((t) => hay.includes(t));
+    })
+    .slice(0, 20);
+
+  // 2. Query Apple Music / iTunes Public Search API (100% CORS-friendly worldwide)
+  let liveTracks: Cue[] = [];
+  let liveAlbums: YtMusicAlbumItem[] = [];
+  const liveArtists: YtMusicArtistItem[] = [];
+
+  try {
+    const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(
+      q
+    )}&entity=song&limit=30`;
+    const res = await fetch(itunesUrl, { signal: AbortSignal.timeout(3500) });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.results)) {
+        liveTracks = data.results.map((r: any): Cue => {
+          // Check if we have this exact song in local library for known YouTube ID & hook
+          const matchedLocal = lib.find(
+            (c) =>
+              c.title.toLowerCase() === (r.trackName || '').toLowerCase() ||
+              (c.artist.toLowerCase().includes((r.artistName || '').toLowerCase()) &&
+                c.title.toLowerCase().includes((r.trackName || '').toLowerCase()))
+          );
+
+          const durationSec = Math.round((r.trackTimeMillis || 210000) / 1000);
+          const rawArt = r.artworkUrl100 || '';
+          const hdArt = rawArt ? rawArt.replace(/\/\d+x\d+bb\./, '/600x600bb.') : undefined;
+
+          if (matchedLocal) {
+            return {
+              ...matchedLocal,
+              art: hdArt || matchedLocal.art,
+              albumTitle: r.collectionName,
+              releaseYear: r.releaseDate ? r.releaseDate.slice(0, 4) : undefined,
+              previewUrl: r.previewUrl,
+            };
+          }
+
+          return {
+            song_id: `live-${r.trackId || Math.random().toString(36).slice(2)}`,
+            title: r.trackName || 'Untitled',
+            artist: r.artistName || 'Unknown Artist',
+            art: hdArt,
+            youtube_ids: [],
+            duration_sec: durationSec,
+            entry_sec: Math.min(30, Math.floor(durationSec * 0.2)),
+            exit_sec: Math.max(durationSec - 30, Math.floor(durationSec * 0.8)),
+            play_full: false,
+            era:
+              r.releaseDate && parseInt(r.releaseDate.slice(0, 4), 10) < 2020
+                ? 'pre2020'
+                : 'post2020',
+            language: 'hindi',
+            subtype: 'party',
+            energy: 8,
+            tags: ['live-catalog', r.primaryGenreName || 'Music'],
+            heat: null,
+            vibe: 'party-banger',
+            isLiveCatalog: true,
+            albumTitle: r.collectionName,
+            releaseYear: r.releaseDate ? r.releaseDate.slice(0, 4) : undefined,
+            previewUrl: r.previewUrl,
+          };
+        });
+      }
+    }
+  } catch {
+    // live search failed or timed out
+  }
+
+  // Also query live albums if requested
+  if (filter === 'all' || filter === 'albums') {
+    try {
+      const albumUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(
+        q
+      )}&entity=album&limit=12`;
+      const res = await fetch(albumUrl, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.results)) {
+          liveAlbums = data.results.map(
+            (alb: any): YtMusicAlbumItem => ({
+              id: `album-${alb.collectionId}`,
+              title: alb.collectionName,
+              artist: alb.artistName,
+              year: alb.releaseDate ? alb.releaseDate.slice(0, 4) : undefined,
+              thumbnail: (alb.artworkUrl100 || '').replace(
+                /\/\d+x\d+bb\./,
+                '/600x600bb.'
+              ),
+              tracks: [],
+            })
+          );
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // Combine: local matched songs with live catalog tracks (avoid duplicates)
+  const combinedMap = new Map<string, Cue>();
+  for (const s of localMatched)
+    combinedMap.set(`${s.title.toLowerCase()}::${s.artist.toLowerCase()}`, s);
+  for (const s of liveTracks) {
+    const key = `${s.title.toLowerCase()}::${s.artist.toLowerCase()}`;
+    if (!combinedMap.has(key)) combinedMap.set(key, s);
+  }
+
+  return {
+    songs: Array.from(combinedMap.values()),
+    artists: liveArtists,
+    albums: liveAlbums,
+  };
+}
+
+/**
+ * Fetches real-time country Top 50 Charts (India / Global) from live open feeds.
+ */
+export async function fetchLiveTrendingCharts(
+  region: 'IN' | 'GLOBAL' = 'IN'
+): Promise<Cue[]> {
+  const lib = getClientLibrary();
+  const countryCode = region === 'IN' ? 'in' : 'us';
+  const url = `https://itunes.apple.com/${countryCode}/rss/topsongs/limit=50/json`;
+
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const entries = data.feed?.entry;
+    if (!Array.isArray(entries)) return [];
+
+    return entries.map((e: any, idx: number): Cue => {
+      const title = e['im:name']?.label || 'Untitled';
+      const artist = e['im:artist']?.label || 'Unknown Artist';
+      const rawArt = e['im:image']?.[2]?.label || '';
+      const hdArt = rawArt ? rawArt.replace(/\/\d+x\d+bb\./, '/600x600bb.') : undefined;
+      const id = e.id?.attributes?.['im:id'] || String(idx);
+
+      // Check if this hit is in our seed database
+      const matched = lib.find(
+        (c) =>
+          c.title.toLowerCase() === title.toLowerCase() ||
+          (c.artist.toLowerCase().includes(artist.toLowerCase()) &&
+            c.title.toLowerCase().includes(title.toLowerCase()))
+      );
+
+      if (matched) {
+        return {
+          ...matched,
+          art: hdArt || matched.art,
+        };
+      }
+
+      return {
+        song_id: `live-chart-${id}`,
+        title,
+        artist,
+        art: hdArt,
+        youtube_ids: [],
+        duration_sec: 210,
+        entry_sec: 35,
+        exit_sec: 140,
+        play_full: false,
+        era: 'post2020',
+        language: region === 'IN' ? 'hindi' : 'english',
+        subtype: 'party',
+        energy: 8,
+        tags: ['chart-top-50', region],
+        heat: null,
+        vibe: 'party-banger',
+        isLiveCatalog: true,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fetches the full tracklist for an album given its iTunes collection ID.
+ */
+export async function fetchLiveAlbumTracks(albumId: string): Promise<Cue[]> {
+  const numericId = albumId.replace(/[^0-9]/g, '');
+  if (!numericId) return [];
+
+  const lib = getClientLibrary();
+  try {
+    const url = `https://itunes.apple.com/lookup?id=${numericId}&entity=song`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const items = (data.results || []).filter(
+      (r: any) => r.wrapperType === 'track'
+    );
+
+    return items.map((r: any): Cue => {
+      const title = r.trackName || 'Untitled';
+      const artist = r.artistName || 'Unknown Artist';
+      const rawArt = r.artworkUrl100 || '';
+      const hdArt = rawArt ? rawArt.replace(/\/\d+x\d+bb\./, '/600x600bb.') : undefined;
+      const dur = Math.round((r.trackTimeMillis || 210000) / 1000);
+
+      const matched = lib.find(
+        (c) =>
+          c.title.toLowerCase() === title.toLowerCase() &&
+          c.artist.toLowerCase().includes(artist.toLowerCase())
+      );
+
+      if (matched) return { ...matched, art: hdArt || matched.art };
+
+      return {
+        song_id: `live-album-${r.trackId}`,
+        title,
+        artist,
+        art: hdArt,
+        youtube_ids: [],
+        duration_sec: dur,
+        entry_sec: Math.min(30, Math.floor(dur * 0.2)),
+        exit_sec: Math.max(dur - 30, Math.floor(dur * 0.8)),
+        play_full: false,
+        era: 'post2020',
+        language: 'hindi',
+        subtype: 'album-track',
+        energy: 7,
+        tags: ['album-track'],
+        heat: null,
+        vibe: 'party-banger',
+        isLiveCatalog: true,
+        albumTitle: r.collectionName,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
